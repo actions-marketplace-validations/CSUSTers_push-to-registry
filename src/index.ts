@@ -215,33 +215,33 @@ async function run(): Promise<void> {
         }
     }
 
-    let pushMsg = `⏳ Pushing "${sourceImages.join(", ")}" to "${destinationImages.join(", ")}" respectively`;
-    if (username) {
-        pushMsg += ` as "${username}"`;
-    }
-    core.info(pushMsg);
-
-    let creds = "";
-    if (username && !password) {
-        core.warning("Username is provided, but password is missing");
-    }
-    else if (!username && password) {
-        core.warning("Password is provided, but username is missing");
-    }
-    else if (username && password) {
-        creds = `${username}:${password}`;
-    }
-
-    let digestFile = digestFileInput;
-    if (!digestFile) {
-        digestFile = `${sourceImages[0].replace(
-            /[/\\/?%*:|"<>]/g,
-            "-",
-        )}_digest.txt`;
-    }
-
-    // push the image
     while (retry > 0) {
+        let pushMsg = `⏳ Pushing "${sourceImages.join(", ")}" to "${destinationImages.join(", ")}" respectively`;
+        if (username) {
+            pushMsg += ` as "${username}"`;
+        }
+        core.info(pushMsg);
+
+        let creds = "";
+        if (username && !password) {
+            core.warning("Username is provided, but password is missing");
+        }
+        else if (!username && password) {
+            core.warning("Password is provided, but username is missing");
+        }
+        else if (username && password) {
+            creds = `${username}:${password}`;
+        }
+
+        let digestFile = digestFileInput;
+        if (!digestFile) {
+            digestFile = `${sourceImages[0].replace(
+                /[/\\/?%*:|"<>]/g,
+                "-",
+            )}_digest.txt`;
+        }
+
+        // push the image
         for (let i = 0; i < destinationImages.length; i++) {
             const args = [];
             if (isImageFromDocker) {
