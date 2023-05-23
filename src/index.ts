@@ -289,8 +289,8 @@ async function run(): Promise<void> {
                 retry = 0;
             }
             catch (err) {
-                core.warning(`Failed to read digest file "${digestFile}": ${err}`);
                 retry -= 1;
+                core.warning(`Failed to read digest file "${digestFile}": ${err}, rest retry: ${retry}`);
             }
         }
     }
