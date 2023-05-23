@@ -34,6 +34,12 @@ export enum Inputs {
      */
     REGISTRY = "registry",
     /**
+     * I want to try it again and again and again and again and again and again and again and again and again and again and again and again...
+     * Required: false
+     * Default: None.
+     */
+    RETRY = "retry",
+    /**
      * 'The tag or tags of the image/manifest to push.
      * For multiple tags, seperate by whitespace. For example, "latest v1"'
      * Required: false

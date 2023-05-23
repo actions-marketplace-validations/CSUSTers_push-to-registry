@@ -35,7 +35,7 @@ let dockerPodmanOpts: string[];
 async function getPodmanPath(): Promise<string> {
     if (podmanPath == null) {
         podmanPath = await io.which("podman", true);
-        await execute(podmanPath, [ "version" ], { group: true });
+        await execute(podmanPath, ["version"], { group: true });
     }
 
     return podmanPath;
@@ -65,7 +65,7 @@ async function run(): Promise<void> {
     const normalizedImage = image.toLowerCase();
     if (isNormalized || image !== normalizedImage) {
         core.warning(`Reference to image and/or tag must be lowercase.`
-        + ` Reference has been converted to be compliant with standard.`);
+            + ` Reference has been converted to be compliant with standard.`);
     }
 
     const registry = core.getInput(Inputs.REGISTRY);
@@ -73,6 +73,11 @@ async function run(): Promise<void> {
     const password = core.getInput(Inputs.PASSWORD);
     const tlsVerify = core.getInput(Inputs.TLS_VERIFY);
     const digestFileInput = core.getInput(Inputs.DIGESTFILE);
+    const _retry = core.getInput(Inputs.RETRY);
+    let retry = parseInt(_retry);
+    if (!retry) {
+        retry = 1;
+    }
 
     // check if all tags provided are in `image:tag` format
     const isFullImageNameTag = isFullImageName(normalizedTagsList[0]);
@@ -93,8 +98,8 @@ async function run(): Promise<void> {
             + `to form registry path "${registryPath}"`);
         if (normalizedImage.indexOf("/") > -1 && registry.indexOf("/") > -1) {
             core.warning(`"${registryPath}" does not seem to be a valid registry path. `
-            + `The registry path should not contain more than 2 slashes. `
-            + `Refer to the Inputs section of the readme for naming image and registry.`);
+                + `The registry path should not contain more than 2 slashes. `
+                + `Refer to the Inputs section of the readme for naming image and registry.`);
         }
 
         sourceImages = normalizedTagsList.map((tag) => getFullImageName(normalizedImage, tag));
@@ -135,13 +140,13 @@ async function run(): Promise<void> {
 
         if (podmanFoundTags.length > 0) {
             core.info(`Tag${podmanFoundTags.length !== 1 ? "s" : ""} "${podmanFoundTags.join(", ")}" `
-            + `found in Podman image storage`);
+                + `found in Podman image storage`);
         }
 
         // Log warning if few tags are not found
         if (podmanMissingTags.length > 0 && podmanFoundTags.length > 0) {
             core.warning(`Tag${podmanMissingTags.length !== 1 ? "s" : ""} "${podmanMissingTags.join(", ")}" `
-            + `not found in Podman image storage`);
+                + `not found in Podman image storage`);
         }
 
         // check if image with all the required tags exist in Docker image storage
@@ -153,13 +158,13 @@ async function run(): Promise<void> {
 
         if (dockerFoundTags.length > 0) {
             core.info(`Tag${dockerFoundTags.length !== 1 ? "s" : ""} "${dockerFoundTags.join(", ")}" `
-            + `found in Docker image storage`);
+                + `found in Docker image storage`);
         }
 
         // Log warning if few tags are not found
         if (dockerMissingTags.length > 0 && dockerFoundTags.length > 0) {
             core.warning(`Tag${dockerMissingTags.length !== 1 ? "s" : ""} "${dockerMissingTags.join(", ")}" `
-            + `not found in Docker image storage`);
+                + `not found in Docker image storage`);
         }
 
         // failing if image with any of the tag is not found in Docker as well as Podman
@@ -180,31 +185,31 @@ async function run(): Promise<void> {
             if (!isPodmanImageLatest) {
                 core.warning(
                     `The version of "${sourceImages[0]}" in the Docker image storage is more recent `
-                        + `than the version in the Podman image storage. The image(s) from the Docker image storage `
-                        + `will be pushed.`
+                    + `than the version in the Podman image storage. The image(s) from the Docker image storage `
+                    + `will be pushed.`
                 );
                 isImageFromDocker = true;
             }
             else {
                 core.warning(
                     `The version of "${sourceImages[0]}" in the Podman image storage is more recent `
-                        + `than the version in the Docker image storage. The image(s) from the Podman image `
-                        + `storage will be pushed.`
+                    + `than the version in the Docker image storage. The image(s) from the Podman image `
+                    + `storage will be pushed.`
                 );
             }
         }
         else if (allTagsinDocker) {
             core.info(
                 `Tag "${sourceImages[0]}" was found in the Docker image storage, but not in the Podman `
-                    + `image storage. The image(s) will be pulled into Podman image storage, pushed, and then `
-                    + `removed from the Podman image storage.`
+                + `image storage. The image(s) will be pulled into Podman image storage, pushed, and then `
+                + `removed from the Podman image storage.`
             );
             isImageFromDocker = true;
         }
         else {
             core.info(
                 `Tag "${sourceImages[0]}" was found in the Podman image storage, but not in the Docker `
-                    + `image storage. The image(s) will be pushed from Podman image storage.`
+                + `image storage. The image(s) will be pushed from Podman image storage.`
             );
         }
     }
@@ -235,54 +240,58 @@ async function run(): Promise<void> {
     }
 
     // push the image
-    for (let i = 0; i < destinationImages.length; i++) {
-        const args = [];
-        if (isImageFromDocker) {
-            args.push(...dockerPodmanOpts);
-        }
-        if (isManifest) {
-            args.push("manifest");
-        }
-        args.push(...[
-            "push",
-            "--quiet",
-            "--digestfile",
-            digestFile,
-            isImageFromDocker ? getFullDockerImageName(sourceImages[i]) : sourceImages[i],
-            destinationImages[i],
-        ]);
-        // to push all the images referenced in the manifest
-        if (isManifest) {
-            args.push("--all");
-        }
-        if (podmanExtraArgs.length > 0) {
-            args.push(...podmanExtraArgs);
-        }
+    while (retry > 0) {
+        for (let i = 0; i < destinationImages.length; i++) {
+            const args = [];
+            if (isImageFromDocker) {
+                args.push(...dockerPodmanOpts);
+            }
+            if (isManifest) {
+                args.push("manifest");
+            }
+            args.push(...[
+                "push",
+                "--quiet",
+                "--digestfile",
+                digestFile,
+                isImageFromDocker ? getFullDockerImageName(sourceImages[i]) : sourceImages[i],
+                destinationImages[i],
+            ]);
+            // to push all the images referenced in the manifest
+            if (isManifest) {
+                args.push("--all");
+            }
+            if (podmanExtraArgs.length > 0) {
+                args.push(...podmanExtraArgs);
+            }
 
-        // check if tls-verify is not set to null
-        if (tlsVerify) {
-            args.push(`--tls-verify=${tlsVerify}`);
-        }
+            // check if tls-verify is not set to null
+            if (tlsVerify) {
+                args.push(`--tls-verify=${tlsVerify}`);
+            }
 
-        // check if registry creds are provided
-        if (creds) {
-            args.push(`--creds=${creds}`);
-        }
+            // check if registry creds are provided
+            if (creds) {
+                args.push(`--creds=${creds}`);
+            }
 
-        await execute(await getPodmanPath(), args);
-        core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
+            await execute(await getPodmanPath(), args);
+            core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
 
-        registryPathList.push(destinationImages[i]);
+            registryPathList.push(destinationImages[i]);
 
-        try {
-            const digest = (await fs.promises.readFile(digestFile)).toString();
-            core.info(digest);
-            // the digest should be the same for every image, but we log it every time
-            // due to https://github.com/redhat-actions/push-to-registry/issues/26
-            core.setOutput(Outputs.DIGEST, digest);
-        }
-        catch (err) {
-            core.warning(`Failed to read digest file "${digestFile}": ${err}`);
+            try {
+                const digest = (await fs.promises.readFile(digestFile)).toString();
+                core.info(digest);
+                // the digest should be the same for every image, but we log it every time
+                // due to https://github.com/redhat-actions/push-to-registry/issues/26
+                core.setOutput(Outputs.DIGEST, digest);
+                retry = 0;
+            }
+            catch (err) {
+                core.warning(`Failed to read digest file "${digestFile}": ${err}`);
+                retry -= 1;
+            }
         }
     }
 
@@ -298,7 +307,7 @@ async function pullImageFromDocker(): Promise<ImageStorageCheckResult> {
         for (const imageWithTag of sourceImages) {
             const commandResult: ExecResult = await execute(
                 await getPodmanPath(),
-                [ ...dockerPodmanOpts, "pull", `docker-daemon:${imageWithTag}` ],
+                [...dockerPodmanOpts, "pull", `docker-daemon:${imageWithTag}`],
                 { ignoreReturnCode: true, failOnStdErr: false, group: true }
             );
             if (commandResult.exitCode === 0) {
@@ -328,7 +337,7 @@ async function checkImageInPodman(): Promise<ImageStorageCheckResult> {
         for (const imageWithTag of sourceImages) {
             const commandResult: ExecResult = await execute(
                 await getPodmanPath(),
-                [ "image", "exists", imageWithTag ],
+                ["image", "exists", imageWithTag],
                 { ignoreReturnCode: true }
             );
             if (commandResult.exitCode === 0) {
@@ -386,7 +395,7 @@ async function createDockerPodmanImageStroage(): Promise<void> {
     core.info(`Creating temporary Podman image storage for pulling from Docker daemon`);
     dockerPodmanRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "podman-from-docker-"));
 
-    dockerPodmanOpts = [ "--root", dockerPodmanRoot ];
+    dockerPodmanOpts = ["--root", dockerPodmanRoot];
 
     if (await isStorageDriverOverlay()) {
         const fuseOverlayfsPath = await findFuseOverlayfsPath();
@@ -397,7 +406,7 @@ async function createDockerPodmanImageStroage(): Promise<void> {
         }
         else {
             core.warning(`"fuse-overlayfs" is not found. Install it before running this action. `
-            + `For more detail see https://github.com/redhat-actions/buildah-build/issues/45`);
+                + `For more detail see https://github.com/redhat-actions/buildah-build/issues/45`);
         }
     }
     else {
@@ -411,7 +420,7 @@ async function removeDockerPodmanImageStroage(): Promise<void> {
             core.info(`Removing temporary Podman image storage for pulling from Docker daemon`);
             await execute(
                 await getPodmanPath(),
-                [ ...dockerPodmanOpts, "rmi", "-a", "-f" ]
+                [...dockerPodmanOpts, "rmi", "-a", "-f"]
             );
             await fs.promises.rmdir(dockerPodmanRoot, { recursive: true });
         }
@@ -429,7 +438,7 @@ async function checkIfManifestsExists(): Promise<boolean> {
     for (const manifest of sourceImages) {
         const commandResult: ExecResult = await execute(
             await getPodmanPath(),
-            [ "manifest", "exists", manifest ],
+            ["manifest", "exists", manifest],
             { ignoreReturnCode: true, group: true }
         );
         if (commandResult.exitCode === 0) {
@@ -475,7 +484,7 @@ async function execute(
     };
 
     if (execOptions.group) {
-        const groupName = [ executable, ...args ].join(" ");
+        const groupName = [executable, ...args].join(" ");
         core.startGroup(groupName);
     }
 
