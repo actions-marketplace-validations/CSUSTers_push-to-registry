@@ -275,12 +275,12 @@ async function run(): Promise<void> {
                 args.push(`--creds=${creds}`);
             }
 
-            await execute(await getPodmanPath(), args);
-            core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
-
-            registryPathList.push(destinationImages[i]);
-
             try {
+                await execute(await getPodmanPath(), args);
+                core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
+
+                registryPathList.push(destinationImages[i]);
+
                 const digest = (await fs.promises.readFile(digestFile)).toString();
                 core.info(digest);
                 // the digest should be the same for every image, but we log it every time
