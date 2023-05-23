@@ -78,6 +78,7 @@ async function run(): Promise<void> {
     if (!retry) {
         retry = 1;
     }
+    core.info(`retry: ${retry}`)
 
     // check if all tags provided are in `image:tag` format
     const isFullImageNameTag = isFullImageName(normalizedTagsList[0]);
